@@ -1,43 +1,62 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+
 body {
     margin: 0;
-    padding: 0;
+    padding: 20px;
+    background-color: transparent !important;
+    font-family: 'Inter', sans-serif;
     overflow: hidden;
-    background-color: transparent;
-    font-family: 'Inter', -apple-system, sans-serif;
 }
 
 #overlay {
     display: flex;
     align-items: center;
-    background: rgba(0, 0, 0, 0.8);
-    border-radius: 15px;
+    background: rgba(18, 18, 18, 0.9);
+    backdrop-filter: blur(10px);
+    border-radius: 12px;
     padding: 10px;
-    width: fit-content;
-    min-width: 300px;
-    color: white;
+    /* Feste Größe */
+    width: 380px; 
+    height: 80px;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
 }
 
 #track-art img {
     width: 60px;
     height: 60px;
-    border-radius: 8px;
-    margin-right: 15px;
-    box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+    border-radius: 6px;
+    object-fit: cover;
 }
 
 #track-info {
+    margin-left: 15px;
     display: flex;
     flex-direction: column;
+    justify-content: center;
+    overflow: hidden;
+    /* Hier startet die Animation für den gesamten Textblock */
+    animation: fadeLoop 8s infinite ease-in-out;
 }
 
 #track-name {
-    font-size: 18px;
-    font-weight: bold;
+    font-size: 16px;
+    font-weight: 900;
+    color: white;
     white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
 }
 
 #artist-name {
-    font-size: 14px;
-    color: #1DB954; /* Spotify Grün */
+    font-size: 13px;
+    color: #1DB954;
+    font-weight: 700;
+    margin-top: 2px;
+}
+
+/* 2 Sekunden Fade-In, Halten, 2 Sekunden Fade-Out */
+@keyframes fadeLoop {
+    0%, 100% { opacity: 0; transform: translateX(-5px); }
+    15%, 85% { opacity: 1; transform: translateX(0px); }
 }
