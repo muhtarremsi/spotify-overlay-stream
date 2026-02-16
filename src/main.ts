@@ -6,20 +6,17 @@ async function main() {
     const code = params.get("code");
     const urlRefreshToken = params.get("refresh_token");
 
-    // Falls ein Token in der URL steckt (TikTok Studio Fix), speichern wir es sofort
     if (urlRefreshToken) {
         localStorage.setItem("refresh_token", urlRefreshToken);
     }
 
     let accessToken = localStorage.getItem("access_token");
     let refreshToken = localStorage.getItem("refresh_token");
-    let expiresAt = localStorage.getItem("expires_at");
 
     if (code) {
         accessToken = await getAccessToken(clientId, code);
         window.history.replaceState({}, document.title, "/"); 
     } else if (refreshToken) {
-        // Wir holen beim Starten immer ein frisches Access Token
         accessToken = await refreshAccessToken(clientId, refreshToken);
     } else {
         redirectToAuthCodeFlow(clientId);
@@ -27,10 +24,8 @@ async function main() {
     }
 
     let currentTrackId = "";
-    // Abfrage-Loop alle 5 Sekunden
     setInterval(async () => {
         const expires = localStorage.getItem("expires_at");
-        // Automatischer Refresh 5 Minuten vor Ablauf
         if (Date.now() > (Number(expires) - 300000)) {
             const rt = localStorage.getItem("refresh_token");
             if (rt) accessToken = await refreshAccessToken(clientId, rt);
