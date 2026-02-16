@@ -1,33 +1,68 @@
 const clientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID || "f43c4064e6524c169b69d773a12277eb";
-const redirectUri = window.location.origin; // Erkennt automatisch die Vercel-URL
+const redirectUri = window.location.origin;
 
-const params = new URLSearchParams(window.location.search);
-const code = params.get("code");
+async function main() {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("code");
 
-if (!code) {
-    redirectToAuthCodeFlow(clientId);
-} else {
-    const accessToken = await getAccessToken(clientId, code);
+    let accessToken = localStorage.getItem("access_token");
+    const refreshToken = localStorage.getItem("refresh_token");
+    const expiresAt = localStorage.getItem("expires_at");
+
+    // Schritt 1: Wenn ein Code in der URL ist -> Erster Login
+    if (code) {
+        accessToken = await getAccessToken(clientId, code);
+        window.history.replaceState({}, document.title, "/"); 
+    } 
+    // Schritt 2: Wenn Token abgelaufen ist -> Refresh nutzen
+    else if (refreshToken && Date.now() > Number(expiresAt)) {
+        accessToken = await refreshAccessToken(clientId, refreshToken);
+    }
+    // Schritt 3: Wenn gar nichts da ist -> Login Flow starten
+    else if (!accessToken) {
+        redirectToAuthCodeFlow(clientId);
+        return;
+    }
+
+    // Abfrage-Schleife (alle 5 Sekunden)
     setInterval(async () => {
-        const track = await fetchNowPlaying(accessToken);
-        if (track && track.item) updateUI(track.item);
+        // Vor jeder Abfrage prüfen, ob das Token abgelaufen ist
+        const currentExpiresAt = localStorage.getItem("expires_at");
+        if (Date.now() > Number(currentExpiresAt)) {
+            const currentRefreshToken = localStorage.getItem("refresh_token");
+            accessToken = await refreshAccessToken(clientId, currentRefreshToken!);
+        }
+
+        const track = await fetchNowPlaying(accessToken!);
+        if (track && track.item) {
+            updateUI(track.item);
+        }
     }, 5000);
 }
 
-async function redirectToAuthCodeFlow(clientId: string) {
-    const verifier = generateCodeVerifier(128);
-    const challenge = await generateCodeChallenge(verifier);
-    localStorage.setItem("verifier", verifier);
+function saveTokens(data: any) {
+    if (data.access_token) localStorage.setItem("access_token", data.access_token);
+    if (data.refresh_token) localStorage.setItem("refresh_token", data.refresh_token);
+    if (data.expires_in) {
+        localStorage.setItem("expires_at", (Date.now() + data.expires_in * 1000).toString());
+    }
+}
 
-    const authParams = new URLSearchParams();
-    authParams.append("client_id", clientId);
-    authParams.append("response_type", "code");
-    authParams.append("redirect_uri", redirectUri);
-    authParams.append("scope", "user-read-currently-playing user-read-playback-state");
-    authParams.append("code_challenge_method", "S256");
-    authParams.append("code_challenge", challenge);
+async function refreshAccessToken(clientId: string, refreshToken: string) {
+    const params = new URLSearchParams();
+    params.append("client_id", clientId);
+    params.append("grant_type", "refresh_token");
+    params.append("refresh_token", refreshToken);
 
-    document.location = `https://accounts.spotify.com/authorize?${authParams.toString()}`;
+    const result = await fetch("https://accounts.spotify.com/api/token", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: params
+    });
+
+    const data = await result.json();
+    saveTokens(data);
+    return data.access_token;
 }
 
 async function getAccessToken(clientId: string, code: string) {
@@ -46,6 +81,7 @@ async function getAccessToken(clientId: string, code: string) {
     });
 
     const data = await result.json();
+    saveTokens(data);
     return data.access_token;
 }
 
@@ -59,9 +95,31 @@ async function fetchNowPlaying(token: string) {
 }
 
 function updateUI(item: any) {
-    document.getElementById("track-name")!.innerText = item.name;
-    document.getElementById("artist-name")!.innerText = item.artists.map((a: any) => a.name).join(", ");
-    document.getElementById("track-art")!.innerHTML = `<img src="${item.album.images[0].url}" style="width:60px;border-radius:8px;" />`;
+    const nameElem = document.getElementById("track-name");
+    const artistElem = document.getElementById("artist-name");
+    const artElem = document.getElementById("track-art");
+
+    if (nameElem) nameElem.innerText = item.name;
+    if (artistElem) artistElem.innerText = item.artists.map((a: any) => a.name).join(", ");
+    if (artElem && item.album.images[0]) {
+        artElem.innerHTML = `<img src="${item.album.images[0].url}" style="width:64px;border-radius:8px;" />`;
+    }
+}
+
+async function redirectToAuthCodeFlow(clientId: string) {
+    const verifier = generateCodeVerifier(128);
+    const challenge = await generateCodeChallenge(verifier);
+    localStorage.setItem("verifier", verifier);
+
+    const authParams = new URLSearchParams();
+    authParams.append("client_id", clientId);
+    authParams.append("response_type", "code");
+    authParams.append("redirect_uri", redirectUri);
+    authParams.append("scope", "user-read-currently-playing user-read-playback-state");
+    authParams.append("code_challenge_method", "S256");
+    authParams.append("code_challenge", challenge);
+
+    document.location = `https://accounts.spotify.com/authorize?${authParams.toString()}`;
 }
 
 function generateCodeVerifier(length: number) {
@@ -79,3 +137,5 @@ async function generateCodeChallenge(codeVerifier: string) {
     return btoa(String.fromCharCode.apply(null, [...new Uint8Array(digest)]))
         .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
+
+main();
