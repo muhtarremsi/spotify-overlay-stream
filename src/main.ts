@@ -1,5 +1,5 @@
 const clientId = import.meta.env.VITE_SPOTIFY_CLIENT_ID || "f43c4064e6524c169b69d773a12277eb";
-const redirectUri = window.location.origin;
+const redirectUri = window.location.origin; // Erkennt automatisch die Vercel-URL
 
 const params = new URLSearchParams(window.location.search);
 const code = params.get("code");
@@ -8,13 +8,9 @@ if (!code) {
     redirectToAuthCodeFlow(clientId);
 } else {
     const accessToken = await getAccessToken(clientId, code);
-    
-    // Alle 5 Sekunden aktualisieren
     setInterval(async () => {
         const track = await fetchNowPlaying(accessToken);
-        if (track && track.item) {
-            updateUI(track.item);
-        }
+        if (track && track.item) updateUI(track.item);
     }, 5000);
 }
 
@@ -23,15 +19,15 @@ async function redirectToAuthCodeFlow(clientId: string) {
     const challenge = await generateCodeChallenge(verifier);
     localStorage.setItem("verifier", verifier);
 
-    const params = new URLSearchParams();
-    params.append("client_id", clientId);
-    params.append("response_type", "code");
-    params.append("redirect_uri", redirectUri);
-    params.append("scope", "user-read-currently-playing user-read-playback-state");
-    params.append("code_challenge_method", "S256");
-    params.append("code_challenge", challenge);
+    const authParams = new URLSearchParams();
+    authParams.append("client_id", clientId);
+    authParams.append("response_type", "code");
+    authParams.append("redirect_uri", redirectUri);
+    authParams.append("scope", "user-read-currently-playing user-read-playback-state");
+    authParams.append("code_challenge_method", "S256");
+    authParams.append("code_challenge", challenge);
 
-    document.location = `https://accounts.spotify.com/authorize?${params.toString()}`;
+    document.location = `https://accounts.spotify.com/authorize?${authParams.toString()}`;
 }
 
 async function getAccessToken(clientId: string, code: string) {
@@ -63,15 +59,9 @@ async function fetchNowPlaying(token: string) {
 }
 
 function updateUI(item: any) {
-    const nameElem = document.getElementById("track-name");
-    const artistElem = document.getElementById("artist-name");
-    const artElem = document.getElementById("track-art");
-
-    if (nameElem) nameElem.innerText = item.name;
-    if (artistElem) artistElem.innerText = item.artists.map((a: any) => a.name).join(", ");
-    if (artElem && item.album.images[0]) {
-        artElem.innerHTML = `<img src="${item.album.images[0].url}" />`;
-    }
+    document.getElementById("track-name")!.innerText = item.name;
+    document.getElementById("artist-name")!.innerText = item.artists.map((a: any) => a.name).join(", ");
+    document.getElementById("track-art")!.innerHTML = `<img src="${item.album.images[0].url}" style="width:60px;border-radius:8px;" />`;
 }
 
 function generateCodeVerifier(length: number) {
